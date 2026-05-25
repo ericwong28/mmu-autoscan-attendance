@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Auto Check-in</title>
+<script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 min-h-screen p-4">
+<div class="max-w-2xl mx-auto space-y-4">
+
+  <!-- ── Status Card ── -->
+  <div class="bg-white rounded-xl shadow p-5">
+    <div class="flex items-center justify-between mb-4">
+      <div class="flex items-center gap-3">
+        <div id="dot" class="w-3 h-3 rounded-full bg-gray-400"></div>
+        <span id="status-text" class="font-semibold text-gray-700">Stopped</span>
+      </div>
+      <span class="text-sm text-gray-400">Last scan: <span id="last-check">—</span></span>
+    </div>
+
+    <div class="flex gap-2">
+      <button onclick="control('start')" id="btn-start"
+        class="px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg text-sm font-medium">
+        Start
+      </button>
+      <button onclick="control('pause')" id="btn-pause"
+        class="px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg text-sm font-medium hidden">
+        Pause
+      </button>
+      <button onclick="control('stop')" id="btn-stop"
+        class="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg text-sm font-medium hidden">
+        Stop
+      </button>
+    </div>
+
+    <div id="session-count-box" class="mt-2 hidden">
+      <p class="text-xs text-gray-400">Check-ins this session: <span id="session-count" class="font-medium text-gray-600">0</span> / <span id="max-checkins-display">2</span></p>
+    </div>
+
+    <div id="last-qr-box" class="mt-3 hidden">
+      <p class="text-xs text-gray-400">Last detected: <span id="last-qr" class="text-gray-600 break-all"></span></p>
+    </div>
+
+    <!-- Test scan -->
+    <div class="mt-4 pt-4 border-t border-gray-100">
+      <div class="flex items-center gap-3">
+        <button onclick="scanNow()" id="btn-scan"
+          class="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-lg text-xs font-medium">
+          🔍 Scan Once
+        </button>
+        <span id="scan-result" class="text-xs text-gray-500"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Config Card ── -->
+  <div class="bg-white rounded-xl shadow p-5">
+    <h2 class="font-semibold text-gray-700 mb-4">⚙️ Settings</h2>
+    <div class="space-y-3">
+
+      <div>
+        <label class="text-sm text-gray-500 block mb-1">Student ID</label>
+        <input id="student_id" type="text" placeholder="Enter your student ID"
+          class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-400">
+      </div>
+
+      <div>
+        <label class="text-sm text-gray-500 block mb-1">Password</label>
+        <input id="password" type="password" placeholder="Enter your password"
+          class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-400">
+      </div>
+
+      <div>
+        <label class="text-sm text-gray-500 block mb-1">
+          URL Keyword Filter
+          <span class="text-gray-400">(leave blank to detect all QR codes)</span>
+        </label>
+        <input id="url_keyword" type="text" placeholder="e.g. osc.mmu.edu.my"
+          class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-400">
+      </div>
+
+      <div>
+        <label class="text-sm text-gray-500 block mb-1">Scan Interval (seconds)</label>
+        <input id="scan_interval" type="number" value="1" min="1"
+          class="w-32 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-400">
+      </div>
+
+      <div>
+        <label class="text-sm text-gray-500 block mb-1">
+          Max check-ins per session
+          <span class="text-gray-400">(auto-stops after reaching this)</span>
+        </label>
+        <input id="max_checkins" type="number" value="2" min="1"
+          class="w-32 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-400">
+      </div>
+
+      <!-- Advanced (collapsible) -->
+      <details class="pt-1">
+        <summary class="text-xs text-gray-400 cursor-pointer select-none hover:text-gray-600">
+          Advanced: custom form field selectors (use if auto-fill fails)
+        </summary>
+        <div class="mt-3 space-y-2 pl-2 border-l-2 border-gray-100">
+          <div>
+            <label class="text-xs text-gray-400 block mb-1">Student ID field CSS selector</label>
+            <input id="id_selector" type="text" placeholder='auto-detected by default, e.g. input[name="loginName"]'
+              class="w-full border border-gray-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-blue-400">
+          </div>
+          <div>
+            <label class="text-xs text-gray-400 block mb-1">Password field CSS selector</label>
+            <input id="pwd_selector" type="text" placeholder='auto-detected by default, e.g. input[type="password"]'
+              class="w-full border border-gray-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-blue-400">
+          </div>
+          <div>
+            <label class="text-xs text-gray-400 block mb-1">Submit button CSS selector</label>
+            <input id="submit_selector" type="text" placeholder='auto-detected by default, e.g. input[name="N_QRCODE_DRV_BUTTON1"]'
+              class="w-full border border-gray-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-blue-400">
+          </div>
+        </div>
+      </details>
+
+      <div class="flex items-center gap-3">
+        <button onclick="saveConfig()"
+          class="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm font-medium">
+          Save Settings
+        </button>
+        <span id="save-msg" class="text-sm text-green-500 hidden">Saved ✓</span>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── Logs Card ── -->
+  <div class="bg-white rounded-xl shadow p-5">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="font-semibold text-gray-700">📋 Check-in History</h2>
+      <button onclick="fetchLogs()" class="text-xs text-blue-500 hover:underline">Refresh</button>
+    </div>
+    <div id="logs-container" class="space-y-1 text-sm max-h-96 overflow-y-auto">
+      <p class="text-gray-400 text-center py-6">No records yet</p>
+    </div>
+  </div>
+
+</div>
+
+<!-- ── Toast ── -->
+<div id="toast" class="fixed bottom-6 right-6 bg-gray-800 text-white px-4 py-2 rounded-lg text-sm shadow-lg transition-opacity opacity-0 pointer-events-none"></div>
+
+<script>
+let ws;
+
+// ── WebSocket ─────────────────────────────────────────────────────────────────
+function initWS() {
+  ws = new WebSocket(`ws://${location.host}/ws`);
+  ws.onmessage = (e) => {
+    const d = JSON.parse(e.data);
+    if (d.type === 'status')    { updateStatusUI(d); updateLastCheck(d.last_check); }
+    if (d.type === 'heartbeat') { updateLastCheck(d.last_check); }
+    if (d.type === 'checkin')   { fetchLogs(); toast(d.success ? `✅ Check-in successful` : `❌ Failed: ${d.msg}`); }
+  };
+  ws.onclose = () => setTimeout(initWS, 3000);
+}
+
+// ── UI updates ────────────────────────────────────────────────────────────────
+function updateStatusUI(s) {
+  const dot      = document.getElementById('dot');
+  const txt      = document.getElementById('status-text');
+  const btnStart = document.getElementById('btn-start');
+  const btnPause = document.getElementById('btn-pause');
+  const btnStop  = document.getElementById('btn-stop');
+
+  if (s.running && !s.paused) {
+    dot.className = 'w-3 h-3 rounded-full bg-green-500';
+    txt.textContent = 'Monitoring';
+    btnStart.classList.add('hidden');
+    btnPause.classList.remove('hidden'); btnPause.textContent = 'Pause';
+    btnStop.classList.remove('hidden');
+  } else if (s.running && s.paused) {
+    dot.className = 'w-3 h-3 rounded-full bg-yellow-500';
+    txt.textContent = 'Paused';
+    btnStart.classList.add('hidden');
+    btnPause.classList.remove('hidden'); btnPause.textContent = 'Resume';
+    btnStop.classList.remove('hidden');
+  } else {
+    dot.className = 'w-3 h-3 rounded-full bg-gray-400';
+    txt.textContent = 'Stopped';
+    btnStart.classList.remove('hidden');
+    btnPause.classList.add('hidden');
+    btnStop.classList.add('hidden');
+  }
+
+  if (s.running) {
+    document.getElementById('session-count-box').classList.remove('hidden');
+    document.getElementById('session-count').textContent = s.session_count ?? 0;
+  } else {
+    document.getElementById('session-count-box').classList.add('hidden');
+  }
+
+  if (s.last_qr) {
+    document.getElementById('last-qr').textContent = s.last_qr;
+    document.getElementById('last-qr-box').classList.remove('hidden');
+  }
+}
+
+function updateLastCheck(ts) {
+  if (!ts) return;
+  const diff = Math.round((Date.now() - new Date(ts.replace(' ', 'T')).getTime()) / 1000);
+  document.getElementById('last-check').textContent =
+    diff < 5 ? 'just now' : `${diff}s ago`;
+}
+
+// ── API calls ─────────────────────────────────────────────────────────────────
+async function control(action) {
+  await fetch('/api/control', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action }),
+  });
+}
+
+async function saveConfig() {
+  await fetch('/api/config', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      student_id:      document.getElementById('student_id').value,
+      password:        document.getElementById('password').value,
+      url_keyword:     document.getElementById('url_keyword').value,
+      scan_interval:   document.getElementById('scan_interval').value,
+      max_checkins:    document.getElementById('max_checkins').value,
+      id_selector:     document.getElementById('id_selector').value,
+      pwd_selector:    document.getElementById('pwd_selector').value,
+      submit_selector: document.getElementById('submit_selector').value,
+    }),
+  });
+  const el = document.getElementById('save-msg');
+  el.classList.remove('hidden');
+  setTimeout(() => el.classList.add('hidden'), 2000);
+}
+
+async function fetchLogs() {
+  const res  = await fetch('/api/logs');
+  const logs = await res.json();
+  const box  = document.getElementById('logs-container');
+
+  if (!logs.length) {
+    box.innerHTML = '<p class="text-gray-400 text-center py-6">No records yet</p>';
+    return;
+  }
+
+  const icon = { success: '✅', failed: '❌', duplicate: '⏭️' };
+  const badge = {
+    success:   'bg-green-100 text-green-700',
+    failed:    'bg-red-100 text-red-700',
+    duplicate: 'bg-gray-100 text-gray-500',
+  };
+
+  box.innerHTML = logs.map(l => `
+    <div class="flex items-start gap-3 py-2 border-b border-gray-50 last:border-0">
+      <span class="text-base mt-0.5">${icon[l.status] ?? '❓'}</span>
+      <div class="flex-1 min-w-0">
+        <div class="flex items-center gap-2 flex-wrap">
+          <span class="text-gray-400 text-xs">${l.detected_at}</span>
+          <span class="text-xs px-1.5 py-0.5 rounded ${badge[l.status] ?? 'bg-gray-100 text-gray-500'}">${l.status}</span>
+        </div>
+        <p class="text-gray-600 text-xs truncate mt-0.5">${l.qr_content}</p>
+        ${l.message ? `<p class="text-gray-400 text-xs">${l.message}</p>` : ''}
+      </div>
+    </div>
+  `).join('');
+}
+
+async function loadConfig() {
+  const res = await fetch('/api/config');
+  const cfg = await res.json();
+  document.getElementById('student_id').value      = cfg.student_id      || '';
+  document.getElementById('password').value        = cfg.password        || '';
+  document.getElementById('url_keyword').value     = cfg.url_keyword     || '';
+  document.getElementById('scan_interval').value   = cfg.scan_interval   || '1';
+  document.getElementById('max_checkins').value    = cfg.max_checkins    || '2';
+  document.getElementById('max-checkins-display').textContent = cfg.max_checkins || '2';
+  document.getElementById('id_selector').value     = cfg.id_selector     || '';
+  document.getElementById('pwd_selector').value    = cfg.pwd_selector    || '';
+  document.getElementById('submit_selector').value = cfg.submit_selector || '';
+}
+
+async function scanNow() {
+  const btn = document.getElementById('btn-scan');
+  const res = document.getElementById('scan-result');
+  btn.disabled = true;
+  res.textContent = 'Scanning…';
+  try {
+    const data = await (await fetch('/api/scan-now')).json();
+    if (data.found && data.found.length > 0) {
+      res.className = 'text-xs text-green-600';
+      res.textContent = `Found ${data.found.length} QR code(s): ${data.found.join(' | ')}`;
+    } else {
+      res.className = 'text-xs text-gray-400';
+      res.textContent = 'No QR codes detected';
+    }
+  } catch (e) {
+    res.className = 'text-xs text-red-500';
+    res.textContent = 'Scan error: ' + e.message;
+  }
+  btn.disabled = false;
+}
+
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.remove('opacity-0');
+  el.classList.add('opacity-100');
+  setTimeout(() => { el.classList.remove('opacity-100'); el.classList.add('opacity-0'); }, 3000);
+}
+
+// ── polling fallback (in case WS drops) ───────────────────────────────────────
+setInterval(async () => {
+  const s = await (await fetch('/api/status')).json();
+  updateStatusUI(s);
+  updateLastCheck(s.last_check);
+}, 5000);
+
+setInterval(fetchLogs, 30000);
+
+// ── init ──────────────────────────────────────────────────────────────────────
+initWS();
+loadConfig();
+fetchLogs();
+</script>
+</body>
+</html>
