@@ -57,12 +57,15 @@ def main():
         print(f"      Warning: {r.stderr.strip()}\n")
 
     # ── 2. Playwright browser ─────────────────────────────────────────────────
-    print("[2/3] Checking Playwright browser...")
-    r = run([python, "-m", "playwright", "install", "chromium"], cwd=base)
+    print("[2/3] Checking Playwright browser (may download ~180 MB on first run)...")
+    r = subprocess.run(
+        [python, "-m", "playwright", "install", "chromium"],
+        cwd=base
+    )
     if r.returncode == 0:
         print("      OK\n")
     else:
-        print(f"      Warning: {r.stderr.strip()}\n")
+        print("      Warning: playwright install may have failed.\n")
 
     # ── 3. Start server ───────────────────────────────────────────────────────
     print("[3/3] Starting server...")
