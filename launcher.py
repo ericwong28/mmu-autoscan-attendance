@@ -5,13 +5,13 @@ Compiled to .exe via: pyinstaller --onefile --name "Auto Check-in" launcher.py
 import os
 import sys
 import shutil
+import socket
 import subprocess
 import time
-import socket
+import webbrowser
 
 
 def find_python() -> str:
-    """Find the system Python executable (even when called from a compiled .exe)."""
     for name in ("python", "python3"):
         p = shutil.which(name)
         if p:
@@ -31,8 +31,22 @@ def find_python() -> str:
     return "python"
 
 
-def run(cmd, **kwargs):
-    return subprocess.run(cmd, capture_output=True, text=True, **kwargs)
+def is_port_open(port: int) -> bool:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.settimeout(0.3)
+        return s.connect_ex(("127.0.0.1", port)) == 0
+
+
+def wait_for_server(port: int, timeout: int = 15) -> bool:
+    print("      Waiting for server", end="", flush=True)
+    for _ in range(timeout * 2):
+        if is_port_open(port):
+            print(" ready!")
+            return True
+        print(".", end="", flush=True)
+        time.sleep(0.5)
+    print(" timed out.")
+    return False
 
 
 def main():
@@ -44,45 +58,45 @@ def main():
     print("╔══════════════════════════════════╗")
     print("║     Auto Check-in  Launcher      ║")
     print("╚══════════════════════════════════╝")
-    print(f"\n  Python  : {python}")
-    print(f"  Folder  : {base}\n")
+    print(f"\n  Python : {python}")
+    print(f"  Folder : {base}\n")
 
     # ── 1. pip dependencies ───────────────────────────────────────────────────
     print("[1/3] Checking pip dependencies...")
-    req = os.path.join(base, "requirements.txt")
-    r = run([python, "-m", "pip", "install", "-r", req, "-q"], cwd=base)
-    if r.returncode == 0:
-        print("      OK\n")
-    else:
-        print(f"      Warning: {r.stderr.strip()}\n")
+    r = subprocess.run(
+        [python, "-m", "pip", "install", "-r",
+         os.path.join(base, "requirements.txt"), "-q"],
+        cwd=base, capture_output=True, text=True,
+    )
+    print("      OK\n" if r.returncode == 0 else f"      Warning: {r.stderr.strip()}\n")
 
     # ── 2. Playwright browser ─────────────────────────────────────────────────
     print("[2/3] Checking Playwright browser (may download ~180 MB on first run)...")
-    r = subprocess.run(
+    subprocess.run(
         [python, "-m", "playwright", "install", "chromium"],
-        cwd=base
+        cwd=base,
     )
-    if r.returncode == 0:
-        print("      OK\n")
-    else:
-        print("      Warning: playwright install may have failed.\n")
+    print()
 
     # ── 3. Start server ───────────────────────────────────────────────────────
     print("[3/3] Starting server...")
-    already_running = socket.connect_ex(("127.0.0.1", 8080)) == 0
-    if already_running:
-        print("      Already running — opening browser...\n")
+    if is_port_open(8080):
+        print("      Already running.\n")
     else:
-        main_py = os.path.join(base, "main.py")
         subprocess.Popen(
-            [python, main_py],
+            [python, os.path.join(base, "main.py")],
             cwd=base,
             creationflags=0x08000000,   # CREATE_NO_WINDOW
         )
-        print("      Server started.\n")
+        if not wait_for_server(8080, timeout=15):
+            print("\n  Could not reach server. Please run main.py manually.")
+            input("  Press Enter to exit...")
+            return
 
-    print("  Browser will open at http://localhost:8080")
-    print("  This window closes in 3 seconds...")
+    # ── Open browser ──────────────────────────────────────────────────────────
+    print("\n  Opening http://localhost:8080 ...")
+    webbrowser.open("http://localhost:8080")
+    print("  Done! This window closes in 3 seconds.")
     time.sleep(3)
 
 
